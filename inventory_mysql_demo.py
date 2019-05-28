@@ -12,6 +12,7 @@
 
 ##-----------------------------------------------------------------------------
 ## Dependencies
+## Requires a Mysql Database
 ## Python SDK Installed or velocloud in the folder
 ## init_vco_api 2required
 ##-----------------------------------------------------------------------------
@@ -922,5 +923,242 @@ for vco in vco_list:
 
 # Close the MySQL connection post table update
 cnx.close()
+
+
+################################################################################################################################
+
+### init_vco_api2.py Script Below
+
+
+
+#!/usr/bin/env python
+
+##-----------------------------------------------------------------------------
+## Copyright (c) 2016 VeloCloud Networks, Inc.
+## All rights reserved.
+##-----------------------------------------------------------------------------
+
+import sys
+import os
+import json
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/pylib")
+import velocloud
+from velocloud.rest import ApiException
+import requests
+import urllib3
+
+## warnings should only be disabled if you disable ssl verification
+#urllib3.disable_warnings()
+
+
+# username = "super@velocloud.net"
+# password = "vcadm!n"
+# operator = True
+# VCO = "https://172.16.4.52/portal/rest"
+
+class ApiWrapper(object):
+    """
+    Stripped down version of the Api Wrapper used by the CLI
+    """
+    def __init__(self, default_url="https://localhost/portal/rest"):
+        # If using dev server, the following may be helpful:
+        velocloud.configuration.verify_ssl = False
+        # By default, the vco_client checks for a cert file (ca-certificates.crt
+        # or ca-bundle.crt) in both
+        # /etc/ssl/certs/ and /etc/pki/tls/certs/
+        # if using a different file, uncomment and change the line below:
+        # vco_client.configuration.ssl_ca_cert = "/etc/ssl/certs/ca-certificates.crt"
+
+        self.default_url = default_url
+        # initialize sdk classes
+        self.client = velocloud.ApiClient(self.default_url)
+        self.api = velocloud.AllApi(self.client)
+        # cookie for storing login status
+        self.auth_cookie = None
+
+    def authenticate(self, username, password, operator):
+        """
+        Because cookie authentication isn't supported
+        in the Swagger/OpenAPI spec yet, we need to
+        tell the Client to save our login cookie
+        after a successful login
+        """
+        auth_method = self.api.login_enterprise_login
+        if 'operator' in locals() and operator == True:
+            auth_method = self.api.login_operator_login
+        # one way to set param: use provided model class
+        o = velocloud.AuthObject()
+        o.username = username
+        o.password = password
+        try:
+            auth_method(o)
+        except ApiException as e:
+            print "Login Error "
+            sys.exit()
+        if not hasattr(self.client, 'last_response'):
+            print "Error: No server response"
+            sys.exit()
+        returned_headers = self.client.last_response.getheaders()
+        try:
+            session_index = returned_headers['Set-Cookie'].find("velocloud.session")
+            session_end = returned_headers['Set-Cookie'].find(";", session_index)
+            self.client.default_headers['Cookie'] = returned_headers['Set-Cookie'][session_index:session_end]
+            self.auth_cookie = returned_headers['Set-Cookie'][session_index:session_end]
+        except Exception:
+            print "Error retrieving authorization cookie."
+            sys.exit()
+        return True
+
+
+
+########## DB Structure SQL ###########################
+
+-- phpMyAdmin SQL Dump
+-- version 4.5.4.1deb2ubuntu2
+-- http://www.phpmyadmin.net
+--
+-- Host: localhost
+-- Generation Time: May 10, 2019 at 01:58 PM
+-- Server version: 5.7.23-0ubuntu0.16.04.1
+-- PHP Version: 7.0.30-0ubuntu0.16.04.1
+
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+SET time_zone = "+00:00";
+
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+
+--
+-- Database: `customer`
+--
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `Customer`
+--
+
+CREATE TABLE `Customer` (
+  `Customer_ID_VCO` varchar(60) NOT NULL,
+  `VCO` text NOT NULL,
+  `Customer_NAME` varchar(255) NOT NULL,
+  `Version` varchar(60) NOT NULL,
+  `Segments_bool` tinyint(1) NOT NULL DEFAULT '0',
+  `Segments_num` int(11) NOT NULL DEFAULT '0',
+  `NVS_bool` tinyint(1) NOT NULL DEFAULT '0',
+  `NVS_num` int(11) NOT NULL DEFAULT '0',
+  `CVH_bool` tinyint(1) NOT NULL DEFAULT '0',
+  `CVH_num` int(11) NOT NULL DEFAULT '0',
+  `VNF_bool` tinyint(1) NOT NULL DEFAULT '0',
+  `HA_bool` tinyint(1) NOT NULL DEFAULT '0',
+  `Cluster_bool` tinyint(1) NOT NULL DEFAULT '0',
+  `VRRP_bool` tinyint(1) NOT NULL DEFAULT '0',
+  `OSPF_BOOL` tinyint(4) NOT NULL DEFAULT '0',
+  `BGP_BOOL` tinyint(4) NOT NULL DEFAULT '0',
+  `ROUTE_NUM` bigint(20) NOT NULL DEFAULT '0',
+  `ROUTE_CHANGE` int(11) NOT NULL DEFAULT '0',
+  `MPLS_BOOL` tinyint(4) NOT NULL DEFAULT '0',
+  `WIRELESS_LINK` tinyint(4) NOT NULL DEFAULT '0',
+  `BACKUP_LINK` tinyint(4) NOT NULL DEFAULT '0',
+  `Partner` char(60) NOT NULL DEFAULT '',
+  `Partner_Email` varchar(2000) NOT NULL DEFAULT ''
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `Edge`
+--
+
+CREATE TABLE `Edge` (
+  `EdgeID` varchar(60) NOT NULL,
+  `EdgeName` varchar(60) DEFAULT NULL,
+  `Customer_ID_VCO` varchar(60) NOT NULL,
+  `Profile_ID` text NOT NULL,
+  `License` text NOT NULL,
+  `Bandwidth` int(11) NOT NULL DEFAULT '0',
+  `Activation_Status` text,
+  `Edge_Status` text,
+  `Activated_Day` datetime DEFAULT CURRENT_TIMESTAMP,
+  `Activated_Days` int(11) NOT NULL DEFAULT '0',
+  `HA` text,
+  `Private_LINKS_num` int(11) NOT NULL DEFAULT '0',
+  `Private_LINKS_bool` tinyint(1) NOT NULL DEFAULT '0',
+  `Private_LINKS_vlan` int(11) NOT NULL DEFAULT '0',
+  `Public_LINKS_num` int(11) NOT NULL DEFAULT '0',
+  `Public_LINKS_bol` tinyint(1) NOT NULL DEFAULT '0',
+  `Public_LINKS_vlan` int(11) NOT NULL DEFAULT '0',
+  `Public_LINKS_BACKUP` int(11) NOT NULL DEFAULT '0',
+  `bgp_bool` tinyint(1) NOT NULL DEFAULT '0',
+  `ospf_bool` tinyint(1) NOT NULL DEFAULT '0',
+  `netflow_bool` tinyint(1) NOT NULL DEFAULT '0',
+  `static_routes_bool` tinyint(1) NOT NULL DEFAULT '0',
+  `static_routes_num` int(1) NOT NULL DEFAULT '0',
+  `Multicast_bool` tinyint(1) NOT NULL DEFAULT '0',
+  `Firewall_rules_bool` tinyint(1) NOT NULL DEFAULT '0',
+  `Firewall_rules_num` int(11) NOT NULL DEFAULT '0',
+  `Firewall_rules_in_bool` tinyint(1) NOT NULL DEFAULT '0',
+  `Firewall_rules_out_bool` tinyint(1) NOT NULL DEFAULT '0',
+  `Business_policy_bool` tinyint(1) NOT NULL DEFAULT '0',
+  `Business_policy_num` int(11) NOT NULL DEFAULT '0',
+  `PUBLIC_LINKS_WIRELESS` int(11) NOT NULL DEFAULT '0',
+  `Firewall_Edge_Specific` tinyint(1) NOT NULL DEFAULT '0',
+  `WAN_Edge_Specific` tinyint(1) NOT NULL DEFAULT '0',
+  `QOS_Edge_Specific` tinyint(1) NOT NULL DEFAULT '0',
+  `Device_Settings_Edge_Specific` tinyint(1) NOT NULL DEFAULT '0',
+  `lat` float DEFAULT NULL,
+  `lon` float DEFAULT NULL,
+  `Score` float NOT NULL DEFAULT '0',
+  `UPLINK_USAGE` int(11) NOT NULL DEFAULT '0',
+  `DOWNLINK_USAGE` int(11) NOT NULL DEFAULT '0',
+  `Version` varchar(60) DEFAULT NULL,
+  `HUB` tinyint(1) NOT NULL DEFAULT '0',
+  `ENGINEER` varchar(50) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `Events`
+--
+
+CREATE TABLE `Events` (
+  `Date` datetime NOT NULL,
+  `EdgeID` varchar(60) NOT NULL,
+  `Name` varchar(60) NOT NULL,
+  `Type` varchar(60) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+--
+-- Indexes for dumped tables
+--
+
+--
+-- Indexes for table `Customer`
+--
+ALTER TABLE `Customer`
+  ADD PRIMARY KEY (`Customer_ID_VCO`),
+  ADD UNIQUE KEY `Customer_ID_VCO` (`Customer_ID_VCO`);
+
+--
+-- Indexes for table `Edge`
+--
+ALTER TABLE `Edge`
+  ADD PRIMARY KEY (`EdgeID`),
+  ADD UNIQUE KEY `EdgeID` (`EdgeID`);
+
+--
+-- Indexes for table `Events`
+--
+ALTER TABLE `Events`
+  ADD UNIQUE KEY `unique_index` (`Date`,`EdgeID`);
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 
 
