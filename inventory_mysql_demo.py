@@ -952,10 +952,10 @@ import urllib3
 #urllib3.disable_warnings()
 
 
-# username = "super@velocloud.net"
-# password = "vcadm!n"
+# username = "user@velocloud.net"
+# password = "passwd"
 # operator = True
-# VCO = "https://172.16.4.52/portal/rest"
+# VCO = "https://10.0.0.0/portal/rest"
 
 class ApiWrapper(object):
     """
